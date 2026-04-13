@@ -92,21 +92,21 @@ def shopify_get_theme_files(theme_id: int) -> str:
 @mcp.tool()
 def shopify_get_theme_file(theme_id: int, file_key: str) -> str:
     """Get the content of a specific theme file.
-    Example file_key: 'templates/product.lp-gummys.liquid' or 'sections/main-product.liquid'"""
+    Example: file_key='templates/product.lp-gummys.liquid' or 'sections/main-product.liquid'"""
     return json.dumps(shopify_get(f"/themes/{theme_id}/assets.json",
                                    params={"asset[key]": file_key}))
 
 @mcp.tool()
 def shopify_update_theme_file(theme_id: int, file_key: str, content: str) -> str:
     """Update or create a theme file (Liquid, CSS, JS, JSON sections).
-    Example file_key: 'sections/product-hero.liquid'"""
+    Example: file_key='sections/product-hero.liquid'"""
     data = {"asset": {"key": file_key, "value": content}}
     return json.dumps(shopify_put(f"/themes/{theme_id}/assets.json", data))
 
 @mcp.tool()
 def shopify_get_template(theme_id: int, template: str = "product.lp-gummys") -> str:
     """Get the JSON or Liquid content of a product template.
-    Example template: 'product.lp-gummys'"""
+    Example: template='product.lp-gummys'"""
     for ext in ["json", "liquid"]:
         try:
             return json.dumps(shopify_get(f"/themes/{theme_id}/assets.json",
@@ -117,17 +117,20 @@ def shopify_get_template(theme_id: int, template: str = "product.lp-gummys") -> 
 
 @mcp.tool()
 def shopify_update_template(theme_id: int, template: str, content: str, ext: str = "json") -> str:
-    """Update a template JSON or Liquid file.
-    Example template: 'product.lp-gummys', ext: 'json' or 'liquid'"""
+    """Update a template file. ext is 'json' or 'liquid'.
+    Example: template='product.lp-gummys', ext='json'"""
     file_key = f"templates/{template}.{ext}"
     data = {"asset": {"key": file_key, "value": content}}
     return json.dumps(shopify_put(f"/themes/{theme_id}/assets.json", data))
 
 # ── ORDERS ────────────────────────────────────────────────────────────────────
 @mcp.tool()
-def shopify_list_orders(limit: int = 50, status: str = "any") -> str:
-    """List orders."""
-    return json.dumps(shopify_get("/orders.json", {"limit": limit, "status": status}))
+def shopify_list_orders(limit: int = 50, status: str = "any",
+                         financial_status: str = None) -> str:
+    """List orders with optional filters."""
+    params = {"limit": limit, "status": status}
+    if financial_status: params["financial_status"] = financial_status
+    return json.dumps(shopify_get("/orders.json", params))
 
 @mcp.tool()
 def shopify_get_order(order_id: int) -> str:
@@ -137,7 +140,7 @@ def shopify_get_order(order_id: int) -> str:
 # ── CUSTOMERS ─────────────────────────────────────────────────────────────────
 @mcp.tool()
 def shopify_list_customers(limit: int = 50) -> str:
-    """List customers."""
+    """List customers from the store."""
     return json.dumps(shopify_get("/customers.json", {"limit": limit}))
 
 @mcp.tool()
@@ -156,4 +159,5 @@ def shopify_list_collections() -> str:
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    print(f"Starting iHELFY Shopify MCP on port {port}...")
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port, path="/mcp")
