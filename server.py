@@ -158,7 +158,6 @@ def shopify_list_collections() -> str:
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 3000))
     transport = os.environ.get("TRANSPORT", "sse")
-    print(f"Starting iHELFY Shopify MCP — transport={transport} port={port}")
-    mcp.run(transport=transport, port=port)
+    print(f"Starting iHELFY Shopify MCP — transport={transport}")
+    mcp.run(transport=transport)
