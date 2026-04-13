@@ -1,8 +1,6 @@
 import os
 import json
 import requests
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from mcp.server.fastmcp import FastMCP
 
 SHOPIFY_STORE = os.environ.get("SHOPIFY_STORE", "")
@@ -14,21 +12,6 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# ── Health check server (Railway needs this) ──────────────────────────────────
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b'{"status":"ok"}')
-    def log_message(self, *args):
-        pass  # suppress logs
-
-def start_health_server():
-    port = int(os.environ.get("PORT", 3000))
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    server.serve_forever()
-
-# ── Shopify helpers ───────────────────────────────────────────────────────────
 def shopify_get(endpoint, params=None):
     r = requests.get(f"{BASE_URL}{endpoint}", headers=HEADERS, params=params)
     r.raise_for_status()
@@ -98,7 +81,7 @@ def shopify_set_product_metafield(product_id: int, namespace: str, key: str,
 # ── THEMES ────────────────────────────────────────────────────────────────────
 @mcp.tool()
 def shopify_list_themes() -> str:
-    """List all themes in the store with their IDs, names, and roles."""
+    """List all themes in the store with IDs, names, and roles."""
     return json.dumps(shopify_get("/themes.json"))
 
 @mcp.tool()
@@ -115,14 +98,14 @@ def shopify_get_theme_file(theme_id: int, file_key: str) -> str:
 
 @mcp.tool()
 def shopify_update_theme_file(theme_id: int, file_key: str, content: str) -> str:
-    """Update/create a theme file (Liquid, CSS, JS, JSON sections).
+    """Update or create a theme file (Liquid, CSS, JS, JSON sections).
     Example file_key: 'sections/product-hero.liquid'"""
     data = {"asset": {"key": file_key, "value": content}}
     return json.dumps(shopify_put(f"/themes/{theme_id}/assets.json", data))
 
 @mcp.tool()
 def shopify_get_template(theme_id: int, template: str = "product.lp-gummys") -> str:
-    """Get the JSON or Liquid content of a template.
+    """Get the JSON or Liquid content of a product template.
     Example template: 'product.lp-gummys'"""
     for ext in ["json", "liquid"]:
         try:
@@ -142,12 +125,9 @@ def shopify_update_template(theme_id: int, template: str, content: str, ext: str
 
 # ── ORDERS ────────────────────────────────────────────────────────────────────
 @mcp.tool()
-def shopify_list_orders(limit: int = 50, status: str = "any",
-                         financial_status: str = None) -> str:
-    """List orders with optional filters."""
-    params = {"limit": limit, "status": status}
-    if financial_status: params["financial_status"] = financial_status
-    return json.dumps(shopify_get("/orders.json", params))
+def shopify_list_orders(limit: int = 50, status: str = "any") -> str:
+    """List orders."""
+    return json.dumps(shopify_get("/orders.json", {"limit": limit, "status": status}))
 
 @mcp.tool()
 def shopify_get_order(order_id: int) -> str:
@@ -175,16 +155,5 @@ def shopify_list_collections() -> str:
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    transport = os.environ.get("TRANSPORT", "http")
-    mcp_port = int(os.environ.get("MCP_PORT", 8000))
-
-    if transport == "http":
-        # Start health server on PORT (Railway healthcheck)
-        health_thread = threading.Thread(target=start_health_server, daemon=True)
-        health_thread.start()
-        print(f"Health server running on PORT {os.environ.get('PORT', 3000)}")
-        # MCP server on MCP_PORT
-        print(f"MCP server starting on port {mcp_port}")
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=mcp_port, path="/mcp")
-    else:
-        mcp.run(transport="stdio")
+    port = int(os.environ.get("PORT", 3000))
+    mcp.run(transport="sse", host="0.0.0.0", port=port)
